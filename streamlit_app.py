@@ -25,8 +25,16 @@ st.write(
    " To use this app, upload a .mp3 voicemail file and hit 'send'."
 )
 
-# Remove Streamlit API key prompt and set API key directly
-api_key = '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'
+# Sidebar for API key input
+st.sidebar.header("OpenAI API Key")
+if "api_key" not in st.session_state:
+    st.session_state.api_key = ""
+api_key_input = st.sidebar.text_input(
+    "Enter your OpenAI API key", 
+    value=st.session_state.api_key, 
+    type="password"
+)
+st.session_state.api_key = api_key_input
 
 ASSISTANT_MODEL = "gpt-5"
 ASSISTANT_INSTRUCTIONS = (
@@ -46,8 +54,6 @@ ASSISTANT_TOOLS = [
     {"type": "file_search", "vector_store_ids": ["vs_68961cff51bc8191a8a5f825639a7d51"]}
 ]
 
-client = OpenAI(api_key=api_key)
-
 # ---------- App state ----------
 if "conversation" not in st.session_state:
     st.session_state.conversation = []
@@ -55,7 +61,17 @@ if "attached_files" not in st.session_state:
     st.session_state.attached_files = []
 
 # ---------- Helpers ----------
+def get_openai_client():
+    if not st.session_state.api_key:
+        st.error("Please enter your OpenAI API key in the sidebar.")
+        return None
+    return OpenAI(api_key=st.session_state.api_key)
+
+
 def transcribe_file(file) -> str:
+    client = get_openai_client()
+    if client is None:
+        return "[No API key provided]"
     resp = client.audio.transcriptions.create(model="gpt-4o-mini-transcribe", file=file)
     return resp.text
 
@@ -213,6 +229,9 @@ def _json_schema_instruction() -> str:
 
 
 def call_responses(conversation_messages: List[Dict], attachments_present: bool):
+    client = get_openai_client()
+    if client is None:
+        return type("DummyResp", (), {"output_text": "[No API key provided]"})()
     input_messages = []
     if ASSISTANT_INSTRUCTIONS:
         input_messages.append({"role": "system", "content": ASSISTANT_INSTRUCTIONS})
