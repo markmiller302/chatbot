@@ -1,3 +1,10 @@
+# Ensure python-docx is installed before any imports
+try:
+    import docx
+except ImportError:
+    import os
+    os.system("pip3 install python-docx")
+
 import streamlit as st
 import os
 import json
@@ -7,16 +14,10 @@ import traceback
 from typing import List, Dict
 import tempfile
 
-# Ensure python-docx is installed
-try:
-    from docx import Document
-    from docx.shared import Pt, RGBColor
-    from docx.enum.text import WD_ALIGN_PARAGRAPH
-except ImportError:
-    os.system("pip3 install python-docx")
-    from docx import Document
-    from docx.shared import Pt, RGBColor
-    from docx.enum.text import WD_ALIGN_PARAGRAPH
+# Import docx after ensuring installation
+from docx import Document
+from docx.shared import Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 # Show title and description.
 st.title("💬 Service Advisor Review")
