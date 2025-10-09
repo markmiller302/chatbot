@@ -282,4 +282,3 @@ for msg in st.session_state.conversation:
         st.markdown(f"**You:** {msg['content']}")
     else:
         st.markdown(f"**Assistant:** {msg['content']}")
-        st.markdown(f"**Assistant:** {msg['content']}")
