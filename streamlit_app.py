@@ -6,6 +6,7 @@ from openai import OpenAI
 import traceback
 from typing import List, Dict
 import tempfile
+import docx
 
 # Import docx with proper error handling
 try:
