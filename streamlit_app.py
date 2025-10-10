@@ -57,6 +57,8 @@ if "conversation" not in st.session_state:
     st.session_state.conversation = []
 if "attached_files" not in st.session_state:
     st.session_state.attached_files = []
+if "download_data" not in st.session_state:
+    st.session_state.download_data = None
 
 # ---------- Helpers ----------
 def get_openai_client():
@@ -239,29 +241,64 @@ def create_fix_my_call_docx(data: dict) -> tuple:
 
 def do_request(user_text: str, files):
     try:
+        # Show progress bar while processing
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        status_text.text("Processing audio file...")
+        progress_bar.progress(25)
+        
         combined = build_combined_user_text(user_text, files)
         st.session_state.conversation.append({"role": "user", "content": combined})
 
+        status_text.text("Generating analysis...")
+        progress_bar.progress(50)
+        
         resp = call_responses(st.session_state.conversation, attachments_present=bool(files))
         reply = getattr(resp, "output_text", None)
         if not reply:
+            progress_bar.empty()
+            status_text.empty()
             return
 
+        status_text.text("Creating document...")
+        progress_bar.progress(75)
+        
         if files and DOCX_AVAILABLE:
             try:
                 data = json.loads(reply)
                 if not data.get("date_iso"):
                     data["date_iso"] = datetime.now().strftime("%Y-%m-%d")
+                    
+                status_text.text("Finalizing document...")
+                progress_bar.progress(90)
+                
                 docx_path, docx_filename = create_fix_my_call_docx(data)
+                
+                # Complete progress
+                progress_bar.progress(100)
+                status_text.text("Document ready for download!")
+                
+                # Store download data in session state
                 with open(docx_path, "rb") as f:
-                    st.download_button(
-                        label=f"Download {docx_filename}",
-                        data=f.read(),
-                        file_name=docx_filename,
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    )
+                    st.session_state.download_data = {
+                        "data": f.read(),
+                        "filename": docx_filename
+                    }
+                
+                # Clear progress indicators after a moment
+                import time
+                time.sleep(1)
+                progress_bar.empty()
+                status_text.empty()
+                
             except Exception as je:
+                progress_bar.empty()
+                status_text.empty()
                 pass  # Silently handle DOCX generation errors
+        else:
+            progress_bar.empty()
+            status_text.empty()
 
         st.session_state.conversation.append({"role": "assistant", "content": reply})
 
@@ -276,7 +313,23 @@ def do_request(user_text: str, files):
 uploaded_files = st.file_uploader("Attach MP3 files", type=["mp3"], accept_multiple_files=True)
 user_input = st.text_area("Type your message", height=100)
 
-if st.button("Send"):
-    do_request(user_input, uploaded_files or [])
+if st.button("🎯 Generate Report", type="primary"):
+    if uploaded_files:
+        # Clear any previous download state
+        if 'download_data' in st.session_state:
+            del st.session_state['download_data']
+        do_request(user_input, uploaded_files or [])
+    else:
+        st.warning("Please upload an MP3 file first.")
+
+# Show download button if data is available
+if st.session_state.download_data:
+    st.download_button(
+        label=f"📄 Download {st.session_state.download_data['filename']}",
+        data=st.session_state.download_data['data'],
+        file_name=st.session_state.download_data['filename'],
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        type="primary"
+    )
 
 # Conversation stored but not displayed
