@@ -11,7 +11,6 @@ try:
     from docx import Document
     from docx.shared import Pt, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH
-    from docx.oxml.exceptions import InvalidXmlError
     DOCX_AVAILABLE = True
 except ImportError:
     DOCX_AVAILABLE = False
