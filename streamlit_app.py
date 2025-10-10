@@ -6,6 +6,10 @@ import traceback
 from typing import List, Dict
 import tempfile
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Import docx with proper error handling
 DOCX_AVAILABLE = False
@@ -15,9 +19,9 @@ try:
     from docx.enum.text import WD_ALIGN_PARAGRAPH
     DOCX_AVAILABLE = True
 except ImportError:
-    st.error("⚠️ python-docx not installed. Please add 'python-docx' to your requirements.txt and redeploy.")
+    pass  # Silently handle missing python-docx
 except Exception as e:
-    st.error(f"Error importing docx: {e}. DOCX functionality disabled.")
+    pass  # Silently handle docx import errors
 
 
 # Show title and description.
@@ -27,16 +31,8 @@ st.write(
    " To use this app, upload a .mp3 voicemail file and hit 'send'."
 )
 
-# Sidebar for API key input
-st.sidebar.header("OpenAI API Key")
-if "api_key" not in st.session_state:
-    st.session_state.api_key = ""
-api_key_input = st.sidebar.text_input(
-    "Enter your OpenAI API key", 
-    value=st.session_state.api_key, 
-    type="password"
-)
-st.session_state.api_key = api_key_input
+# Get API key from environment variable or Streamlit secrets
+st.session_state.api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY")
 
 ASSISTANT_MODEL = "gpt-5"
 ASSISTANT_INSTRUCTIONS = (
@@ -64,9 +60,6 @@ if "attached_files" not in st.session_state:
 
 # ---------- Helpers ----------
 def get_openai_client():
-    if not st.session_state.api_key:
-        st.error("Please enter your OpenAI API key in the sidebar.")
-        return None
     return OpenAI(api_key=st.session_state.api_key)
 
 
@@ -252,7 +245,6 @@ def do_request(user_text: str, files):
         resp = call_responses(st.session_state.conversation, attachments_present=bool(files))
         reply = getattr(resp, "output_text", None)
         if not reply:
-            st.error("Responses API returned no text output.")
             return
 
         if files and DOCX_AVAILABLE:
@@ -268,20 +260,13 @@ def do_request(user_text: str, files):
                         file_name=docx_filename,
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     )
-                st.success(f"Ready to download: {docx_filename}")
             except Exception as je:
-                st.error(f"[DOCX generation issue: {je}]")
-                st.markdown(f"**Assistant:** {reply}")
-        else:
-            if files and not DOCX_AVAILABLE:
-                st.warning("DOCX functionality not available. Showing text output instead.")
-            st.markdown(f"**Assistant:** {reply}")
+                pass  # Silently handle DOCX generation errors
 
         st.session_state.conversation.append({"role": "assistant", "content": reply})
 
     except Exception as e:
         tb = traceback.format_exc()
-        st.error(f"Error: {type(e).__name__}: {e}")
         with open("error.log", "a", encoding="utf-8") as log:
             log.write(tb + "")
     finally:
@@ -294,9 +279,4 @@ user_input = st.text_area("Type your message", height=100)
 if st.button("Send"):
     do_request(user_input, uploaded_files or [])
 
-# Display conversation
-for msg in st.session_state.conversation:
-    if msg["role"] == "user":
-        st.markdown(f"**You:** {msg['content']}")
-    else:
-        st.markdown(f"**Assistant:** {msg['content']}")
+# Conversation stored but not displayed

@@ -1,3 +1,4 @@
 streamlit
 openai
-python-docx 
+python-docx
+python-dotenv 
