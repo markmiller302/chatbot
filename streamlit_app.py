@@ -168,7 +168,7 @@ def call_responses(conversation_messages: List[Dict], attachments_present: bool)
         kwargs["tools"] = ASSISTANT_TOOLS
     return client.responses.create(**kwargs)
 
-# ---------- PDF helpers ----------
+# ---------- DOCX helpers ----------
 RATING_BONUS = {"Needs Work": 0, "Okay": 5, "Good": 10, "Great": 15}
 
 def compute_overall(sections):
@@ -177,9 +177,26 @@ def compute_overall(sections):
         total += RATING_BONUS.get(s.get("rating", ""), 0)
     return min(total, 100)
 
-def create_fix_my_call_pdf(data: dict) -> tuple:
-    if not PDF_AVAILABLE:
-        raise RuntimeError("reportlab is not available")
+def _apply_body_font(run):
+    run.font.size = Pt(12)
+
+def _add_heading(p, text):
+    run = p.add_run(text)
+    run.bold = True
+    _apply_body_font(run)
+
+def _add_text(p, text):
+    run = p.add_run(text)
+    _apply_body_font(run)
+
+def _add_red_text(p, text):
+    run = p.add_run(text)
+    _apply_body_font(run)
+    run.font.color.rgb = RGBColor(0xFF, 0x00, 0x00)
+
+def create_fix_my_call_docx(data: dict) -> tuple:
+    if not DOCX_AVAILABLE:
+        raise RuntimeError("python-docx is not available")
     
     advisor = data.get("advisor_name") or "Service Advisor"
     date_iso = data.get("date_iso") or datetime.now().strftime("%Y-%m-%d")
@@ -189,50 +206,16 @@ def create_fix_my_call_pdf(data: dict) -> tuple:
 
     overall = compute_overall(sections)
 
-    safe_name = advisor.replace("/", "-").replace("\\", "-")
-    filename = f"Fix My Call - {safe_name} - {date_iso}.pdf"
-    temp_path = os.path.join(tempfile.gettempdir(), filename)
-
-    doc = SimpleDocTemplate(temp_path, pagesize=letter)
-    styles = getSampleStyleSheet()
-    
-    # Custom styles
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=12,
-        alignment=1,  # Center
-        spaceAfter=20
-    )
-    
-    heading_style = ParagraphStyle(
-        'CustomHeading',
-        parent=styles['Heading2'],
-        fontSize=12,
-        bold=True,
-        spaceAfter=10
-    )
-    
-    normal_style = ParagraphStyle(
-        'CustomNormal',
-        parent=styles['Normal'],
-        fontSize=12,
-        spaceAfter=10
-    )
-    
-    red_style = ParagraphStyle(
-        'RedText',
-        parent=styles['Normal'],
-        fontSize=12,
-        textColor=red
-    )
-
-    story = []
+    doc = Document()
 
     # Title
-    title = Paragraph(f"Fix My Call — {date_iso} — {advisor}", title_style)
-    story.append(title)
-    story.append(Spacer(1, 20))
+    title_para = doc.add_paragraph()
+    t = title_para.add_run(f"Fix My Call — {date_iso} — {advisor}")
+    t.bold = True
+    t.font.size = Pt(12)
+    title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    doc.add_paragraph("")
 
     # Sections
     for s in sections:
@@ -241,43 +224,52 @@ def create_fix_my_call_pdf(data: dict) -> tuple:
         notes = s.get("notes", "Notes")
         opts = s.get("options") or ["Needs Work", "Okay", "Good", "Great"]
 
-        # Section heading
-        story.append(Paragraph(name, heading_style))
-        
-        # Rating options with selected one in red
-        rating_text = ""
+        p = doc.add_paragraph()
+        _add_heading(p, name)
+
+        p2 = doc.add_paragraph()
         for idx, opt in enumerate(opts):
             if opt == rating:
-                rating_text += f'<font color="red">{opt}</font>'
+                _add_red_text(p2, opt)
             else:
-                rating_text += opt
+                _add_text(p2, opt)
             if idx < len(opts) - 1:
-                rating_text += "  |  "
-        
-        story.append(Paragraph(rating_text, normal_style))
-        story.append(Paragraph(notes, normal_style))
-        story.append(Spacer(1, 15))
+                _add_text(p2, "  |  ")
+
+        p3 = doc.add_paragraph()
+        _add_text(p3, notes)
+
+        doc.add_paragraph("")
 
     # Next Steps
-    story.append(Paragraph("Next Steps", heading_style))
+    p = doc.add_paragraph()
+    _add_heading(p, "Next Steps")
     if next_steps:
         for step in next_steps:
-            story.append(Paragraph(f"• {step}", normal_style))
+            li = doc.add_paragraph()
+            _add_text(li, f"• {step}")
     else:
-        story.append(Paragraph("• (none)", normal_style))
-    
-    story.append(Spacer(1, 15))
+        li = doc.add_paragraph()
+        _add_text(li, "• (none)")
+
+    doc.add_paragraph("")
 
     # Overall Score
-    score_text = f'Overall Score: <font color="red">{overall}%</font>'
-    story.append(Paragraph(score_text, heading_style))
-    story.append(Spacer(1, 15))
+    p = doc.add_paragraph()
+    _add_heading(p, "Overall Score: ")
+    _add_red_text(p, f"{overall}%")
+
+    doc.add_paragraph("")
 
     # Footer
-    footer_text = '<b>Your Reviewing Trainer:</b> Mike Tatich'
-    story.append(Paragraph(footer_text, normal_style))
+    p = doc.add_paragraph()
+    _add_heading(p, "Your Reviewing Trainer: ")
+    _add_text(p, "Mike Tatich")
 
-    doc.build(story)
+    safe_name = advisor.replace("/", "-").replace("\\", "-")
+    filename = f"Fix My Call - {safe_name} - {date_iso}.docx"
+    temp_path = os.path.join(tempfile.gettempdir(), filename)
+    doc.save(temp_path)
     return temp_path, filename
 
 # ---------- Main request ----------
@@ -293,26 +285,26 @@ def do_request(user_text: str, files):
             st.error("Responses API returned no text output.")
             return
 
-        if files and PDF_AVAILABLE:
+        if files and DOCX_AVAILABLE:
             try:
                 data = json.loads(reply)
                 if not data.get("date_iso"):
                     data["date_iso"] = datetime.now().strftime("%Y-%m-%d")
-                pdf_path, pdf_filename = create_fix_my_call_pdf(data)
-                with open(pdf_path, "rb") as f:
+                docx_path, docx_filename = create_fix_my_call_docx(data)
+                with open(docx_path, "rb") as f:
                     st.download_button(
-                        label=f"Download {pdf_filename}",
+                        label=f"Download {docx_filename}",
                         data=f.read(),
-                        file_name=pdf_filename,
-                        mime="application/pdf"
+                        file_name=docx_filename,
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     )
-                st.success(f"Ready to download: {pdf_filename}")
+                st.success(f"Ready to download: {docx_filename}")
             except Exception as je:
-                st.error(f"[PDF generation issue: {je}]")
+                st.error(f"[DOCX generation issue: {je}]")
                 st.markdown(f"**Assistant:** {reply}")
         else:
-            if files and not PDF_AVAILABLE:
-                st.warning("PDF functionality not available. Showing text output instead.")
+            if files and not DOCX_AVAILABLE:
+                st.warning("DOCX functionality not available. Showing text output instead.")
             st.markdown(f"**Assistant:** {reply}")
 
         st.session_state.conversation.append({"role": "assistant", "content": reply})
