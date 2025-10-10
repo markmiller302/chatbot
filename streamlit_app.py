@@ -1,4 +1,16 @@
-# Ensure python-docx is installed before any imports
+# Force install python-docx package
+import os
+import subprocess
+import sys
+
+def install_docx():
+    try:
+        import docx
+    except ImportError:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "python-docx"])
+
+install_docx()
+
 import streamlit as st
 import os
 import json
@@ -7,6 +19,11 @@ from openai import OpenAI
 import traceback
 from typing import List, Dict
 import tempfile
+
+# Import docx after ensuring installation
+from docx import Document
+from docx.shared import Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 # Show title and description.
 st.title("💬 Service Advisor Review")
@@ -126,6 +143,107 @@ def call_responses(conversation_messages: List[Dict], attachments_present: bool)
         kwargs["tools"] = ASSISTANT_TOOLS
     return client.responses.create(**kwargs)
 
+# ---------- DOCX helpers ----------
+RATING_BONUS = {"Needs Work": 0, "Okay": 5, "Good": 10, "Great": 15}
+
+def compute_overall(sections):
+    total = 55
+    for s in sections:
+        total += RATING_BONUS.get(s.get("rating", ""), 0)
+    return min(total, 100)
+
+def _apply_body_font(run):
+    run.font.size = Pt(12)
+
+def _add_heading(p, text):
+    run = p.add_run(text)
+    run.bold = True
+    _apply_body_font(run)
+
+def _add_text(p, text):
+    run = p.add_run(text)
+    _apply_body_font(run)
+
+def _add_red_text(p, text):
+    run = p.add_run(text)
+    _apply_body_font(run)
+    run.font.color.rgb = RGBColor(0xFF, 0x00, 0x00)
+
+def create_fix_my_call_docx(data: dict) -> tuple:
+    advisor = data.get("advisor_name") or "Service Advisor"
+    date_iso = data.get("date_iso") or datetime.now().strftime("%Y-%m-%d")
+    sections = data.get("sections", [])
+    next_steps = data.get("next_steps", [])
+    transcript = data.get("transcript", "")
+
+    overall = compute_overall(sections)
+
+    doc = Document()
+
+    # Title
+    title_para = doc.add_paragraph()
+    t = title_para.add_run(f"Fix My Call — {date_iso} — {advisor}")
+    t.bold = True
+    t.font.size = Pt(12)
+    title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    doc.add_paragraph("")
+
+    # Sections
+    for s in sections:
+        name = s.get("name", "Section")
+        rating = s.get("rating", "Needs Work")
+        notes = s.get("notes", "Notes")
+        opts = s.get("options") or ["Needs Work", "Okay", "Good", "Great"]
+
+        p = doc.add_paragraph()
+        _add_heading(p, name)
+
+        p2 = doc.add_paragraph()
+        for idx, opt in enumerate(opts):
+            if opt == rating:
+                _add_red_text(p2, opt)
+            else:
+                _add_text(p2, opt)
+            if idx < len(opts) - 1:
+                _add_text(p2, "  |  ")
+
+        p3 = doc.add_paragraph()
+        _add_text(p3, notes)
+
+        doc.add_paragraph("")
+
+    # Next Steps
+    p = doc.add_paragraph()
+    _add_heading(p, "Next Steps")
+    if next_steps:
+        for step in next_steps:
+            li = doc.add_paragraph()
+            _add_text(li, f"• {step}")
+    else:
+        li = doc.add_paragraph()
+        _add_text(li, "• (none)")
+
+    doc.add_paragraph("")
+
+    # Overall Score
+    p = doc.add_paragraph()
+    _add_heading(p, "Overall Score: ")
+    _add_red_text(p, f"{overall}%")
+
+    doc.add_paragraph("")
+
+    # Footer
+    p = doc.add_paragraph()
+    _add_heading(p, "Your Reviewing Trainer: ")
+    _add_text(p, "Mike Tatich")
+
+    safe_name = advisor.replace("/", "-").replace("\\", "-")
+    filename = f"Fix My Call - {safe_name} - {date_iso}.docx"
+    temp_path = os.path.join(tempfile.gettempdir(), filename)
+    doc.save(temp_path)
+    return temp_path, filename
+
 # ---------- Main request ----------
 
 def do_request(user_text: str, files):
@@ -139,8 +257,27 @@ def do_request(user_text: str, files):
             st.error("Responses API returned no text output.")
             return
 
+        if files:
+            try:
+                data = json.loads(reply)
+                if not data.get("date_iso"):
+                    data["date_iso"] = datetime.now().strftime("%Y-%m-%d")
+                docx_path, docx_filename = create_fix_my_call_docx(data)
+                with open(docx_path, "rb") as f:
+                    st.download_button(
+                        label=f"Download {docx_filename}",
+                        data=f.read(),
+                        file_name=docx_filename,
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    )
+                st.success(f"Ready to download: {docx_filename}")
+            except Exception as je:
+                st.error(f"[DOCX generation issue: {je}]")
+                st.markdown(f"**Assistant:** {reply}")
+        else:
+            st.markdown(f"**Assistant:** {reply}")
+
         st.session_state.conversation.append({"role": "assistant", "content": reply})
-        st.markdown(f"**Assistant:** {reply}")
 
     except Exception as e:
         tb = traceback.format_exc()
