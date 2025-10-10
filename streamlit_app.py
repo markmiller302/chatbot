@@ -1,11 +1,30 @@
 import subprocess
 import sys
+import os
 
 # Force install python-docx if not available
-try:
-    import docx
-except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "python-docx"])
+def install_python_docx():
+    try:
+        import docx
+        return True
+    except ImportError:
+        try:
+            # Try installing with different methods
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "python-docx", "--user"])
+            return True
+        except subprocess.CalledProcessError:
+            try:
+                subprocess.check_call(["pip3", "install", "python-docx", "--user"])
+                return True
+            except subprocess.CalledProcessError:
+                try:
+                    os.system("pip3 install python-docx --user")
+                    return True
+                except:
+                    return False
+
+# Attempt installation
+docx_installed = install_python_docx()
 
 import streamlit as st
 import json
@@ -16,17 +35,20 @@ from typing import List, Dict
 import tempfile
 
 # Import docx with proper error handling
-try:
-    from docx import Document
-    from docx.shared import Pt, RGBColor
-    from docx.enum.text import WD_ALIGN_PARAGRAPH
-    DOCX_AVAILABLE = True
-except ImportError:
-    DOCX_AVAILABLE = False
-    st.error("python-docx not available. Please install with: pip install python-docx")
-except Exception as e:
-    DOCX_AVAILABLE = False
-    st.error(f"Error importing docx: {e}")
+DOCX_AVAILABLE = False
+if docx_installed:
+    try:
+        from docx import Document
+        from docx.shared import Pt, RGBColor
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        DOCX_AVAILABLE = True
+    except ImportError:
+        st.warning("python-docx installation failed. DOCX functionality disabled.")
+    except Exception as e:
+        st.warning(f"Error importing docx: {e}. DOCX functionality disabled.")
+
+if not DOCX_AVAILABLE:
+    st.info("Note: DOCX functionality is not available. Text output will be shown instead.")
 
 
 # Show title and description.
