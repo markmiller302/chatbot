@@ -316,14 +316,13 @@ user_input = st.text_area("Type your message", height=100)
 if st.button("🎯 Generate Report", type="primary"):
     if uploaded_files:
         # Clear any previous download state
-        if 'download_data' in st.session_state:
-            del st.session_state['download_data']
+        st.session_state.download_data = None
         do_request(user_input, uploaded_files or [])
     else:
         st.warning("Please upload an MP3 file first.")
 
 # Show download button if data is available
-if st.session_state.download_data:
+if st.session_state.download_data is not None:
     st.download_button(
         label=f"📄 Download {st.session_state.download_data['filename']}",
         data=st.session_state.download_data['data'],
