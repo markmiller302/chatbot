@@ -9,16 +9,16 @@ def install_python_docx():
         return True
     except ImportError:
         try:
-            # Try installing with different methods
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "python-docx", "--user"])
+            # Try installing without --user flag for virtual environments
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "python-docx"])
             return True
         except subprocess.CalledProcessError:
             try:
-                subprocess.check_call(["pip3", "install", "python-docx", "--user"])
+                subprocess.check_call(["pip3", "install", "python-docx"])
                 return True
             except subprocess.CalledProcessError:
                 try:
-                    os.system("pip3 install python-docx --user")
+                    os.system("pip3 install python-docx")
                     return True
                 except:
                     return False
