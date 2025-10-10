@@ -11,6 +11,7 @@ import tempfile
 
 # Import docx after ensuring installation
 from docx import Document
+from docx import exceptions
 from docx.shared import Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
