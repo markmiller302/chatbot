@@ -1,6 +1,17 @@
-# Ensure python-docx is installed before any imports
+# Force install python-docx package
+import os
+import subprocess
+import sys
 
-import docx
+def install_docx():
+    try:
+        import docx
+    except ImportError:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "python-docx"])
+
+install_docx()
+
+# Ensure python-docx is installed before any imports
 import streamlit as st
 import os
 import json
