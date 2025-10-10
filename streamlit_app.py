@@ -34,18 +34,17 @@ import traceback
 from typing import List, Dict
 import tempfile
 
-# Import docx with proper error handling
+# Import docx with proper error handling - no automatic installation
 DOCX_AVAILABLE = False
-if docx_installed:
-    try:
-        from docx import Document
-        from docx.shared import Pt, RGBColor
-        from docx.enum.text import WD_ALIGN_PARAGRAPH
-        DOCX_AVAILABLE = True
-    except ImportError:
-        st.warning("python-docx installation failed. DOCX functionality disabled.")
-    except Exception as e:
-        st.warning(f"Error importing docx: {e}. DOCX functionality disabled.")
+try:
+    from docx import Document
+    from docx.shared import Pt, RGBColor
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    DOCX_AVAILABLE = True
+except ImportError:
+    st.warning("python-docx not available. Please run 'pip install python-docx' manually if you need DOCX functionality.")
+except Exception as e:
+    st.warning(f"Error importing docx: {e}. DOCX functionality disabled.")
 
 if not DOCX_AVAILABLE:
     st.info("Note: DOCX functionality is not available. Text output will be shown instead.")
