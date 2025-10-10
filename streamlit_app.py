@@ -1,31 +1,3 @@
-import subprocess
-import sys
-import os
-
-# Force install python-docx if not available
-def install_python_docx():
-    try:
-        import docx
-        return True
-    except ImportError:
-        try:
-            # Try installing without --user flag for virtual environments
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "python-docx"])
-            return True
-        except subprocess.CalledProcessError:
-            try:
-                subprocess.check_call(["pip3", "install", "python-docx"])
-                return True
-            except subprocess.CalledProcessError:
-                try:
-                    os.system("pip3 install python-docx")
-                    return True
-                except:
-                    return False
-
-# Attempt installation
-docx_installed = install_python_docx()
-
 import streamlit as st
 import json
 from datetime import datetime
@@ -33,8 +5,9 @@ from openai import OpenAI
 import traceback
 from typing import List, Dict
 import tempfile
+import os
 
-# Import docx with proper error handling - no automatic installation
+# Import docx with proper error handling
 DOCX_AVAILABLE = False
 try:
     from docx import Document
@@ -42,12 +15,9 @@ try:
     from docx.enum.text import WD_ALIGN_PARAGRAPH
     DOCX_AVAILABLE = True
 except ImportError:
-    st.warning("python-docx not available. Please run 'pip install python-docx' manually if you need DOCX functionality.")
+    st.error("⚠️ python-docx not installed. Please add 'python-docx' to your requirements.txt and redeploy.")
 except Exception as e:
-    st.warning(f"Error importing docx: {e}. DOCX functionality disabled.")
-
-if not DOCX_AVAILABLE:
-    st.info("Note: DOCX functionality is not available. Text output will be shown instead.")
+    st.error(f"Error importing docx: {e}. DOCX functionality disabled.")
 
 
 # Show title and description.
