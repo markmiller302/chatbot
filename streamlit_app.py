@@ -1,13 +1,3 @@
-import subprocess
-import sys
-import os
-
-# Force install python-docx
-try:
-    import docx
-except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "python-docx"])
-
 import streamlit as st
 import json
 from datetime import datetime
