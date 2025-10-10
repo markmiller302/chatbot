@@ -1,5 +1,3 @@
-
-
 import streamlit as st
 import os
 import json
@@ -9,11 +7,20 @@ import traceback
 from typing import List, Dict
 import tempfile
 
-# Import docx after ensuring installation
-from docx import Document
-from docx import exceptions
-from docx.shared import Pt, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+# Import docx with proper error handling
+try:
+    from docx import Document
+    from docx.shared import Pt, RGBColor
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml.exceptions import InvalidXmlError
+    DOCX_AVAILABLE = True
+except ImportError:
+    DOCX_AVAILABLE = False
+    st.error("python-docx not available. Please install with: pip install python-docx")
+except Exception as e:
+    DOCX_AVAILABLE = False
+    st.error(f"Error importing docx: {e}")
+
 
 # Show title and description.
 st.title("💬 Service Advisor Review")
@@ -160,6 +167,9 @@ def _add_red_text(p, text):
     run.font.color.rgb = RGBColor(0xFF, 0x00, 0x00)
 
 def create_fix_my_call_docx(data: dict) -> tuple:
+    if not DOCX_AVAILABLE:
+        raise RuntimeError("python-docx is not available")
+    
     advisor = data.get("advisor_name") or "Service Advisor"
     date_iso = data.get("date_iso") or datetime.now().strftime("%Y-%m-%d")
     sections = data.get("sections", [])
@@ -247,7 +257,7 @@ def do_request(user_text: str, files):
             st.error("Responses API returned no text output.")
             return
 
-        if files:
+        if files and DOCX_AVAILABLE:
             try:
                 data = json.loads(reply)
                 if not data.get("date_iso"):
@@ -265,6 +275,8 @@ def do_request(user_text: str, files):
                 st.error(f"[DOCX generation issue: {je}]")
                 st.markdown(f"**Assistant:** {reply}")
         else:
+            if files and not DOCX_AVAILABLE:
+                st.warning("DOCX functionality not available. Showing text output instead.")
             st.markdown(f"**Assistant:** {reply}")
 
         st.session_state.conversation.append({"role": "assistant", "content": reply})
