@@ -1,10 +1,6 @@
 # Ensure python-docx is installed before any imports
-try:
-    import docx
-except ImportError:
-    import os
-    os.system("pip3 install python-docx")
 
+import docx
 import streamlit as st
 import os
 import json
