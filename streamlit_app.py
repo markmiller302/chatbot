@@ -32,15 +32,24 @@ st.write(
 )
 
 # Get API key from environment variable or Streamlit secrets
-api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY")
+api_key = os.getenv("OPENAI_API_KEY")
+if not api_key:
+    try:
+        api_key = st.secrets["OPENAI_API_KEY"]
+    except:
+        api_key = None
+
+# Set the OpenAI API key as environment variable for the OpenAI library
+if api_key:
+    os.environ["OPENAI_API_KEY"] = api_key
+
 st.session_state.api_key = api_key
 
-# Debug: Log API key status (first 10 chars only for security)
-with open("debug.log", "a", encoding="utf-8") as log:
-    if api_key:
-        log.write(f"{datetime.now()}: API key loaded: {api_key[:10]}...\n")
-    else:
-        log.write(f"{datetime.now()}: No API key found\n")
+# Debug: Show API key status
+if api_key:
+    st.success(f"🔑 API Key loaded: {api_key[:10]}...")
+else:
+    st.error("❌ No API key found. Please check your .env file or Streamlit secrets.")
 
 ASSISTANT_MODEL = "gpt-4"
 ASSISTANT_INSTRUCTIONS = (
@@ -70,7 +79,8 @@ if "download_data" not in st.session_state:
 
 # ---------- Helpers ----------
 def get_openai_client():
-    return OpenAI(api_key=st.session_state.api_key)
+    # OpenAI client will automatically use OPENAI_API_KEY environment variable
+    return OpenAI()
 
 
 def transcribe_file(file) -> str:
@@ -381,17 +391,24 @@ if st.session_state.download_data is not None:
 
 # Debug section (remove in production)
 with st.expander("Debug Info"):
-    st.write(f"API Key Status: {'✅ Loaded' if st.session_state.api_key else '❌ Missing'}")
+    api_key = st.session_state.get('api_key')
+    if api_key:
+        st.write(f"API Key Status: ✅ Loaded ({api_key[:10]}...)")
+    else:
+        st.write("API Key Status: ❌ Missing")
     st.write(f"DOCX Available: {'✅ Yes' if DOCX_AVAILABLE else '❌ No'}")
     if st.button("Test API Connection"):
         try:
             client = get_openai_client()
-            test_response = client.chat.completions.create(
-                model="gpt-4",
-                messages=[{"role": "user", "content": "Say hello"}],
-                max_tokens=5
-            )
-            st.success("✅ API connection working!")
+            if not client:
+                st.error("❌ No API client - missing API key")
+            else:
+                test_response = client.chat.completions.create(
+                    model="gpt-4",
+                    messages=[{"role": "user", "content": "Say hello"}],
+                    max_tokens=5
+                )
+                st.success("✅ API connection working!")
         except Exception as e:
             st.error(f"❌ API Error: {e}")
 
