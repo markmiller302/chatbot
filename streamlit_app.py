@@ -31,13 +31,35 @@ st.write(
    " To use this app, upload a .mp3 voicemail file and hit 'send'."
 )
 
-# Get API key from environment variable or Streamlit secrets
-api_key = os.getenv("OPENAI_API_KEY")
+# Load environment variables from .env file with absolute path
+env_path = os.path.join(os.path.dirname(__file__), '.env')
+load_dotenv(env_path)
+
+# Multiple methods to get API key
+api_key = None
+
+# Method 1: Direct from .env file
+if os.path.exists(env_path):
+    with open(env_path, 'r') as f:
+        for line in f:
+            if line.startswith('OPENAI_API_KEY='):
+                api_key = line.split('=', 1)[1].strip()
+                break
+
+# Method 2: Environment variable
+if not api_key:
+    api_key = os.getenv("OPENAI_API_KEY")
+
+# Method 3: Streamlit secrets
 if not api_key:
     try:
         api_key = st.secrets["OPENAI_API_KEY"]
     except:
-        api_key = None
+        pass
+
+# Method 4: Hardcoded fallback (for development only)
+if not api_key:
+    api_key = "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"
 
 # Set the OpenAI API key as environment variable for the OpenAI library
 if api_key:
@@ -50,6 +72,8 @@ if api_key:
     st.success(f"🔑 API Key loaded: {api_key[:10]}...")
 else:
     st.error("❌ No API key found. Please check your .env file or Streamlit secrets.")
+    st.info(f"Looking for .env file at: {env_path}")
+    st.info(f"File exists: {os.path.exists(env_path)}")
 
 ASSISTANT_MODEL = "gpt-4"
 ASSISTANT_INSTRUCTIONS = (
