@@ -17,31 +17,11 @@ A Streamlit application that analyzes service advisor voicemails and generates s
 pip install -r requirements.txt
 ```
 
-### 2. Configure OpenAI API Key
+### 2. Get OpenAI API Key
 
-**Important: Never commit your API key to version control!**
-
-Choose one of these methods:
-
-#### Option A: Environment Variable (Recommended)
-```bash
-export OPENAI_API_KEY="your-api-key-here"
-streamlit run streamlit_app.py
-```
-
-#### Option B: .env File (Local Development)
-1. Create a `.env` file in the project root:
-```
-OPENAI_API_KEY=your-api-key-here
-```
-2. The `.env` file is already in `.gitignore` and won't be committed
-
-#### Option C: Streamlit Secrets (Streamlit Cloud)
-1. Create `.streamlit/secrets.toml`:
-```toml
-OPENAI_API_KEY = "your-api-key-here"
-```
-2. This file is already in `.gitignore`
+1. Go to https://platform.openai.com/account/api-keys
+2. Create a new API key
+3. Copy the key (starts with `sk-`)
 
 ### 3. Run the Application
 
@@ -51,21 +31,25 @@ streamlit run streamlit_app.py
 
 ## Usage
 
-1. Upload an MP3 voicemail file
-2. Click "🎯 Generate Report"
-3. Wait for processing (transcription + analysis)
-4. Download the generated Word document
-
-## Deployment
-
-For production deployment:
-- Use environment variables or cloud secret management
-- Never hardcode API keys in source code
-- Ensure `.env` and `secrets.toml` are in `.gitignore`
+1. **Enter API Key**: Paste your OpenAI API key in the sidebar
+2. **Upload File**: Upload an MP3 voicemail file
+3. **Generate Report**: Click "🎯 Generate Report"
+4. **Wait for Processing**: The app will transcribe and analyze the audio
+5. **Download**: Click the download button for the generated Word document
 
 ## Security Notes
 
-- API keys are loaded securely from environment variables or secrets
-- The application includes multiple fallback methods for API key loading
-- Debug information shows only the first 10 characters of API keys
-- All sensitive files are excluded from version control
+- API keys are entered directly into the app interface
+- Keys are stored only in browser session (not saved to disk)
+- No API keys are stored in the source code
+- Each user must provide their own API key
+
+## Deployment
+
+This app can be deployed to any Streamlit-compatible platform:
+- Streamlit Cloud
+- Heroku
+- AWS/GCP/Azure
+- Local deployment
+
+No environment variables or secrets configuration required.

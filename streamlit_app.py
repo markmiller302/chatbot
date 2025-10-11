@@ -6,10 +6,6 @@ import traceback
 from typing import List, Dict
 import tempfile
 import os
-from dotenv import load_dotenv
-
-# Load environment variables from .env file
-load_dotenv()
 
 # Import docx with proper error handling
 DOCX_AVAILABLE = False
@@ -31,46 +27,17 @@ st.write(
    " To use this app, upload a .mp3 voicemail file and hit 'send'."
 )
 
-# Load environment variables from .env file with absolute path
-env_path = os.path.join(os.path.dirname(__file__), '.env')
-load_dotenv(env_path)
-
-# SECURITY: Multiple secure methods to get API key
-# Never hardcode API keys in source code!
-api_key = None
-
-# Method 1: Direct from .env file
-if os.path.exists(env_path):
-    with open(env_path, 'r') as f:
-        for line in f:
-            if line.startswith('OPENAI_API_KEY='):
-                api_key = line.split('=', 1)[1].strip()
-                break
-
-# Method 2: Environment variable
-if not api_key:
-    api_key = os.getenv("OPENAI_API_KEY")
-
-# Method 3: Streamlit secrets
-if not api_key:
-    try:
-        api_key = st.secrets["OPENAI_API_KEY"]
-    except:
-        pass
-
-# Set the OpenAI API key as environment variable for the OpenAI library
-if api_key:
-    os.environ["OPENAI_API_KEY"] = api_key
-
-st.session_state.api_key = api_key
-
-# Debug: Show API key status
-if api_key:
-    st.success(f"🔑 API Key loaded: {api_key[:10]}...")
-else:
-    st.error("❌ No API key found. Please check your .env file or Streamlit secrets.")
-    st.info(f"Looking for .env file at: {env_path}")
-    st.info(f"File exists: {os.path.exists(env_path)}")
+# Sidebar for API key input
+st.sidebar.header("OpenAI API Key")
+if "api_key" not in st.session_state:
+    st.session_state.api_key = ""
+api_key_input = st.sidebar.text_input(
+    "Enter your OpenAI API key", 
+    value=st.session_state.api_key, 
+    type="password",
+    help="Get your API key from https://platform.openai.com/account/api-keys"
+)
+st.session_state.api_key = api_key_input
 
 ASSISTANT_MODEL = "gpt-4"
 ASSISTANT_INSTRUCTIONS = (
@@ -100,16 +67,21 @@ if "download_data" not in st.session_state:
 
 # ---------- Helpers ----------
 def get_openai_client():
-    # OpenAI client will automatically use OPENAI_API_KEY environment variable
-    return OpenAI()
+    api_key = st.session_state.get('api_key', '').strip()
+    if not api_key:
+        return None
+    return OpenAI(api_key=api_key)
 
 
 def transcribe_file(file) -> str:
     client = get_openai_client()
     if client is None:
-        return "[No API key provided]"
-    resp = client.audio.transcriptions.create(model="whisper-1", file=file)
-    return resp.text
+        return "[Error: Please enter your OpenAI API key in the sidebar]"
+    try:
+        resp = client.audio.transcriptions.create(model="whisper-1", file=file)
+        return resp.text
+    except Exception as e:
+        return f"[Transcription Error: {e}]"
 
 
 def build_combined_user_text(user_text: str, files) -> str:
@@ -159,7 +131,7 @@ def _json_schema_instruction() -> str:
 def call_responses(conversation_messages: List[Dict], attachments_present: bool):
     client = get_openai_client()
     if client is None:
-        return type("DummyResp", (), {"output_text": "[No API key provided]"})() 
+        return type("DummyResp", (), {"output_text": "[Error: Please enter your OpenAI API key in the sidebar]"})() 
     
     messages = []
     if ASSISTANT_INSTRUCTIONS:
@@ -393,12 +365,14 @@ uploaded_files = st.file_uploader("Attach MP3 files", type=["mp3"], accept_multi
 user_input = st.text_area("Type your message", height=100)
 
 if st.button("🎯 Generate Report", type="primary"):
-    if uploaded_files:
+    if not st.session_state.api_key.strip():
+        st.error("❌ Please enter your OpenAI API key in the sidebar first.")
+    elif not uploaded_files:
+        st.warning("⚠️ Please upload an MP3 file first.")
+    else:
         # Clear any previous download state
         st.session_state.download_data = None
         do_request(user_input, uploaded_files or [])
-    else:
-        st.warning("Please upload an MP3 file first.")
 
 # Show download button if data is available
 if st.session_state.download_data is not None:
@@ -409,28 +383,5 @@ if st.session_state.download_data is not None:
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         type="primary"
     )
-
-# Debug section (remove in production)
-with st.expander("Debug Info"):
-    api_key = st.session_state.get('api_key')
-    if api_key:
-        st.write(f"API Key Status: ✅ Loaded ({api_key[:10]}...)")
-    else:
-        st.write("API Key Status: ❌ Missing")
-    st.write(f"DOCX Available: {'✅ Yes' if DOCX_AVAILABLE else '❌ No'}")
-    if st.button("Test API Connection"):
-        try:
-            client = get_openai_client()
-            if not client:
-                st.error("❌ No API client - missing API key")
-            else:
-                test_response = client.chat.completions.create(
-                    model="gpt-4",
-                    messages=[{"role": "user", "content": "Say hello"}],
-                    max_tokens=5
-                )
-                st.success("✅ API connection working!")
-        except Exception as e:
-            st.error(f"❌ API Error: {e}")
 
 # Conversation stored but not displayed
