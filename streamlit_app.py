@@ -32,7 +32,15 @@ st.write(
 )
 
 # Get API key from environment variable or Streamlit secrets
-st.session_state.api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY")
+api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY")
+st.session_state.api_key = api_key
+
+# Debug: Log API key status (first 10 chars only for security)
+with open("debug.log", "a", encoding="utf-8") as log:
+    if api_key:
+        log.write(f"{datetime.now()}: API key loaded: {api_key[:10]}...\n")
+    else:
+        log.write(f"{datetime.now()}: No API key found\n")
 
 ASSISTANT_MODEL = "gpt-4"
 ASSISTANT_INSTRUCTIONS = (
@@ -253,6 +261,10 @@ def do_request(user_text: str, files):
         progress_bar = st.progress(0)
         status_text = st.empty()
         
+        # Debug logging
+        with open("debug.log", "a", encoding="utf-8") as log:
+            log.write(f"{datetime.now()}: Starting request with {len(files)} files\n")
+        
         status_text.text("Processing audio file...")
         progress_bar.progress(25)
         
@@ -262,15 +274,19 @@ def do_request(user_text: str, files):
         status_text.text("Generating analysis...")
         progress_bar.progress(50)
         
+        # Debug: Check API key before call
+        with open("debug.log", "a", encoding="utf-8") as log:
+            log.write(f"{datetime.now()}: Making API call with key: {st.session_state.api_key[:10] if st.session_state.api_key else 'None'}...\n")
+        
         resp = call_responses(st.session_state.conversation, attachments_present=bool(files))
         reply = getattr(resp, "output_text", None)
         
         with open("debug.log", "a", encoding="utf-8") as log:
-            log.write(f"{datetime.now()}: Got response: {reply[:100]}...\n")
+            log.write(f"{datetime.now()}: Got response: {reply[:100] if reply else 'None'}...\n")
             
-        if not reply:
+        if not reply or "[API Error:" in reply:
             progress_bar.empty()
-            status_text.empty()
+            status_text.text(f"Error: {reply}")
             return
 
         status_text.text("Creating document...")
@@ -278,12 +294,18 @@ def do_request(user_text: str, files):
         
         if files and DOCX_AVAILABLE:
             try:
+                with open("debug.log", "a", encoding="utf-8") as log:
+                    log.write(f"{datetime.now()}: Attempting to parse JSON response\n")
+                    
                 data = json.loads(reply)
                 if not data.get("date_iso"):
                     data["date_iso"] = datetime.now().strftime("%Y-%m-%d")
                     
                 status_text.text("Finalizing document...")
                 progress_bar.progress(90)
+                
+                with open("debug.log", "a", encoding="utf-8") as log:
+                    log.write(f"{datetime.now()}: Creating DOCX with data: {data.get('advisor_name', 'Unknown')}\n")
                 
                 docx_path, docx_filename = create_fix_my_call_docx(data)
                 
@@ -298,16 +320,25 @@ def do_request(user_text: str, files):
                         "filename": docx_filename
                     }
                 
+                with open("debug.log", "a", encoding="utf-8") as log:
+                    log.write(f"{datetime.now()}: Successfully created download: {docx_filename}\n")
+                
                 # Clear progress indicators after a moment
                 import time
                 time.sleep(1)
                 progress_bar.empty()
                 status_text.empty()
                 
-            except Exception as je:
+            except json.JSONDecodeError as je:
+                with open("debug.log", "a", encoding="utf-8") as log:
+                    log.write(f"{datetime.now()}: JSON parse error: {je}. Response was: {reply}\n")
                 progress_bar.empty()
-                status_text.empty()
-                pass  # Silently handle DOCX generation errors
+                status_text.text("Error: Invalid response format")
+            except Exception as je:
+                with open("debug.log", "a", encoding="utf-8") as log:
+                    log.write(f"{datetime.now()}: DOCX creation error: {je}\n")
+                progress_bar.empty()
+                status_text.text(f"Error creating document: {je}")
         else:
             progress_bar.empty()
             status_text.empty()
@@ -347,5 +378,21 @@ if st.session_state.download_data is not None:
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         type="primary"
     )
+
+# Debug section (remove in production)
+with st.expander("Debug Info"):
+    st.write(f"API Key Status: {'✅ Loaded' if st.session_state.api_key else '❌ Missing'}")
+    st.write(f"DOCX Available: {'✅ Yes' if DOCX_AVAILABLE else '❌ No'}")
+    if st.button("Test API Connection"):
+        try:
+            client = get_openai_client()
+            test_response = client.chat.completions.create(
+                model="gpt-4",
+                messages=[{"role": "user", "content": "Say hello"}],
+                max_tokens=5
+            )
+            st.success("✅ API connection working!")
+        except Exception as e:
+            st.error(f"❌ API Error: {e}")
 
 # Conversation stored but not displayed
