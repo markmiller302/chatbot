@@ -27,7 +27,7 @@ except Exception as e:
 # Show title and description.
 st.title("💬 Service Advisor Review")
 st.write(
-    "This is a chatbot that uses OpenAI's GPT-5 model to generate responses. "
+    "This is a chatbot that uses OpenAI's GPT-4 model to generate responses. "
    " To use this app, upload a .mp3 voicemail file and hit 'send'."
 )
 
@@ -35,7 +35,8 @@ st.write(
 env_path = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(env_path)
 
-# Multiple methods to get API key
+# SECURITY: Multiple secure methods to get API key
+# Never hardcode API keys in source code!
 api_key = None
 
 # Method 1: Direct from .env file
@@ -56,10 +57,6 @@ if not api_key:
         api_key = st.secrets["OPENAI_API_KEY"]
     except:
         pass
-
-# Method 4: Hardcoded fallback (for development only)
-if not api_key:
-    api_key = "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"
 
 # Set the OpenAI API key as environment variable for the OpenAI library
 if api_key:
