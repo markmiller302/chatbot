@@ -34,7 +34,7 @@ st.write(
 # Get API key from environment variable or Streamlit secrets
 st.session_state.api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY")
 
-ASSISTANT_MODEL = "gpt-5"
+ASSISTANT_MODEL = "gpt-4"
 ASSISTANT_INSTRUCTIONS = (
     "Review uploaded voicemails between service advisors within the automotive repair industry and customers. "
     "Fill out the corresponding Fix My Call Template with input from the audio file and reference the Sales Fix training courses "
@@ -69,7 +69,7 @@ def transcribe_file(file) -> str:
     client = get_openai_client()
     if client is None:
         return "[No API key provided]"
-    resp = client.audio.transcriptions.create(model="gpt-4o-mini-transcribe", file=file)
+    resp = client.audio.transcriptions.create(model="whisper-1", file=file)
     return resp.text
 
 
@@ -120,18 +120,26 @@ def _json_schema_instruction() -> str:
 def call_responses(conversation_messages: List[Dict], attachments_present: bool):
     client = get_openai_client()
     if client is None:
-        return type("DummyResp", (), {"output_text": "[No API key provided]"})()
-    input_messages = []
+        return type("DummyResp", (), {"output_text": "[No API key provided]"})() 
+    
+    messages = []
     if ASSISTANT_INSTRUCTIONS:
-        input_messages.append({"role": "system", "content": ASSISTANT_INSTRUCTIONS})
+        messages.append({"role": "system", "content": ASSISTANT_INSTRUCTIONS})
     if attachments_present:
-        input_messages.append({"role": "system", "content": _json_schema_instruction()})
-    input_messages.extend(conversation_messages)
+        messages.append({"role": "system", "content": _json_schema_instruction()})
+    messages.extend(conversation_messages)
 
-    kwargs = {"model": ASSISTANT_MODEL, "input": input_messages}
-    if ASSISTANT_TOOLS:
-        kwargs["tools"] = ASSISTANT_TOOLS
-    return client.responses.create(**kwargs)
+    try:
+        response = client.chat.completions.create(
+            model=ASSISTANT_MODEL,
+            messages=messages
+        )
+        
+        # Create a response object with output_text attribute
+        output_text = response.choices[0].message.content
+        return type("APIResponse", (), {"output_text": output_text})()
+    except Exception as e:
+        return type("ErrorResp", (), {"output_text": f"[API Error: {e}]"})()
 
 # ---------- DOCX helpers ----------
 RATING_BONUS = {"Needs Work": 0, "Okay": 5, "Good": 10, "Great": 15}
@@ -256,6 +264,10 @@ def do_request(user_text: str, files):
         
         resp = call_responses(st.session_state.conversation, attachments_present=bool(files))
         reply = getattr(resp, "output_text", None)
+        
+        with open("debug.log", "a", encoding="utf-8") as log:
+            log.write(f"{datetime.now()}: Got response: {reply[:100]}...\n")
+            
         if not reply:
             progress_bar.empty()
             status_text.empty()
@@ -305,7 +317,12 @@ def do_request(user_text: str, files):
     except Exception as e:
         tb = traceback.format_exc()
         with open("error.log", "a", encoding="utf-8") as log:
-            log.write(tb + "")
+            log.write(f"{datetime.now()}: {tb}\n")
+        # Clear progress indicators on error
+        if 'progress_bar' in locals():
+            progress_bar.empty()
+        if 'status_text' in locals():
+            status_text.empty()
     finally:
         st.session_state.attached_files = []
 
