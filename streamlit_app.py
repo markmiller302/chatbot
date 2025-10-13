@@ -27,17 +27,12 @@ st.write(
    " To use this app, upload a .mp3 voicemail file and hit 'send'."
 )
 
-# Sidebar for API key input
-st.sidebar.header("OpenAI API Key")
-if "api_key" not in st.session_state:
-    st.session_state.api_key = ""
-api_key_input = st.sidebar.text_input(
-    "Enter your OpenAI API key", 
-    value=st.session_state.api_key, 
-    type="password",
-    help="Get your API key from https://platform.openai.com/account/api-keys"
-)
-st.session_state.api_key = api_key_input
+# Get API key from Streamlit secrets
+try:
+    st.session_state.api_key = st.secrets["openai_api_key"]
+except KeyError:
+    st.error("❌ OpenAI API key not found in secrets. Please configure the OPENAI_API_KEY secret.")
+    st.stop()
 
 ASSISTANT_MODEL = "gpt-4"
 ASSISTANT_INSTRUCTIONS = (
@@ -67,7 +62,7 @@ if "download_data" not in st.session_state:
 
 # ---------- Helpers ----------
 def get_openai_client():
-    api_key = st.session_state.get('api_key', '').strip()
+    api_key = st.session_state.get('api_key')
     if not api_key:
         return None
     return OpenAI(api_key=api_key)
@@ -76,7 +71,7 @@ def get_openai_client():
 def transcribe_file(file) -> str:
     client = get_openai_client()
     if client is None:
-        return "[Error: Please enter your OpenAI API key in the sidebar]"
+        return "[Error: OpenAI API key not configured]"
     try:
         resp = client.audio.transcriptions.create(model="whisper-1", file=file)
         return resp.text
@@ -131,7 +126,7 @@ def _json_schema_instruction() -> str:
 def call_responses(conversation_messages: List[Dict], attachments_present: bool):
     client = get_openai_client()
     if client is None:
-        return type("DummyResp", (), {"output_text": "[Error: Please enter your OpenAI API key in the sidebar]"})() 
+        return type("DummyResp", (), {"output_text": "[Error: OpenAI API key not configured]"})() 
     
     messages = []
     if ASSISTANT_INSTRUCTIONS:
@@ -365,9 +360,7 @@ uploaded_files = st.file_uploader("Attach MP3 files", type=["mp3"], accept_multi
 user_input = st.text_area("Type your message", height=100)
 
 if st.button("🎯 Generate Report", type="primary"):
-    if not st.session_state.api_key.strip():
-        st.error("❌ Please enter your OpenAI API key in the sidebar first.")
-    elif not uploaded_files:
+    if not uploaded_files:
         st.warning("⚠️ Please upload an MP3 file first.")
     else:
         # Clear any previous download state

@@ -17,13 +17,7 @@ A Streamlit application that analyzes service advisor voicemails and generates s
 pip install -r requirements.txt
 ```
 
-### 2. Get OpenAI API Key
-
-1. Go to https://platform.openai.com/account/api-keys
-2. Create a new API key
-3. Copy the key (starts with `sk-`)
-
-### 3. Run the Application
+### 2. Run the Application
 
 ```bash
 streamlit run streamlit_app.py
@@ -31,25 +25,19 @@ streamlit run streamlit_app.py
 
 ## Usage
 
-1. **Enter API Key**: Paste your OpenAI API key in the sidebar
-2. **Upload File**: Upload an MP3 voicemail file
-3. **Generate Report**: Click "🎯 Generate Report"
-4. **Wait for Processing**: The app will transcribe and analyze the audio
-5. **Download**: Click the download button for the generated Word document
+1. **Upload File**: Upload an MP3 voicemail file
+2. **Generate Report**: Click "🎯 Generate Report"
+3. **Wait for Processing**: The app will transcribe and analyze the audio
+4. **Download**: Click the download button for the generated Word document
 
 ## Security Notes
 
-- API keys are entered directly into the app interface
-- Keys are stored only in browser session (not saved to disk)
-- No API keys are stored in the source code
-- Each user must provide their own API key
+- API key is stored securely in Streamlit Cloud secrets
+- No API keys are stored in source code or configuration files
+- The app automatically loads the API key from the cloud deployment
 
 ## Deployment
 
-This app can be deployed to any Streamlit-compatible platform:
-- Streamlit Cloud
-- Heroku
-- AWS/GCP/Azure
-- Local deployment
+This app is configured to run on Streamlit Cloud with the OpenAI API key stored as a secret in the deployment settings.
 
-No environment variables or secrets configuration required.
+**Note**: The API key is already configured in the Streamlit Cloud deployment. No additional setup required.

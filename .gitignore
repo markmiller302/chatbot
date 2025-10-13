@@ -1,5 +1,4 @@
-.streamlit/secrets.toml
-.env
+# No local secrets needed - using Streamlit Cloud secrets
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
