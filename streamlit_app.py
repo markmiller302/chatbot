@@ -29,9 +29,9 @@ st.write(
 
 # Get API key from Streamlit secrets
 try:
-    st.session_state.api_key = st.secrets["api_key"]
+    st.session_state.api_key = st.secrets["openai"]["api_key"]
 except KeyError:
-    st.error("❌ OpenAI API key not found in secrets. Please configure the OPENAI_API_KEY secret.")
+    st.error("❌ OpenAI API key not found in secrets. Please configure the openai.api_key secret.")
     st.stop()
 
 ASSISTANT_MODEL = "gpt-4"
