@@ -114,6 +114,7 @@ def _json_schema_instruction() -> str:
         "{"
         "  \"advisor_name\": \"Name of the service advisor extracted from the call\","
         "  \"date_iso\": \"YYYY-MM-DD\","
+        "  \"opening_summary\": \"1-3 sentence summary of the call purpose, customer situation, and coaching focus\","
         "  \"sections\": ["
         "    {"
         "      \"name\": \"Impression [Tonality/Charisma/Speed/Word Choice]\","
@@ -197,6 +198,7 @@ def create_fix_my_call_docx(data: dict) -> tuple:
     overall_feedback = data.get("overall_feedback", "")
     recommended_materials = data.get("recommended_materials", [])
     transcript = data.get("transcript", "")
+    opening_summary = data.get("opening_summary", "")
 
     overall = compute_overall(sections)
 
@@ -210,6 +212,11 @@ def create_fix_my_call_docx(data: dict) -> tuple:
     title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     doc.add_paragraph("")
+    # Opening Summary (beneath title)
+    if opening_summary:
+        p = doc.add_paragraph()
+        _add_text(p, opening_summary)
+        doc.add_paragraph("")
 
     # Sections
     for s in sections:
