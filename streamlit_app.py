@@ -108,24 +108,31 @@ def build_combined_user_text(user_text: str, files) -> str:
 
 def _json_schema_instruction() -> str:
     return (
-        "When an audio clip is attached, output ONLY the following JSON (no prose before or after):"
+        "Return a SINGLE JSON object and nothing else (no Markdown, no code fences, no prose). "
+        "All keys listed below MUST be present even if values are empty. If a value is unknown, use an empty string \"\" or an empty array []. "
+        "Use today's date for date_iso if not inferable from context.\n"
         "{"
-        "  \"advisor_name\": \"...\","
+        "  \"advisor_name\": \"Name of the service advisor extracted from the call\","
         "  \"date_iso\": \"YYYY-MM-DD\","
         "  \"sections\": ["
         "    {"
         "      \"name\": \"Impression [Tonality/Charisma/Speed/Word Choice]\","
         "      \"rating\": \"Needs Work|Okay|Good|Great\","
-        "      \"notes\": \"coach analysis\","
+        "      \"notes\": \"2-5 sentences of coach analysis tailored to the call, referencing Sales Fix concepts when helpful\","
         "      \"options\": [\"Needs Work\",\"Okay\",\"Good\",\"Great\"]"
         "    },"
-        "    { \"name\": \"Leadership & Professionalism [Conciseness/Confidence/Preparedness]\", \"rating\": \"...\", \"notes\": \"...\", \"options\": [\"Needs Work\",\"Okay\",\"Good\",\"Great\"] },"
-        "    { \"name\": \"Execution [Scripts Used/Driving Conversation/Achieved Goals]\", \"rating\": \"...\", \"notes\": \"...\", \"options\": [\"Needs Work\",\"Okay\",\"Good\",\"Great\"] },"
+        "    { \"name\": \"Leadership & Professionalism [Conciseness/Confidence/Preparedness]\", \"rating\": \"Needs Work|Okay|Good|Great\", \"notes\": \"2-5 sentences of coach analysis\", \"options\": [\"Needs Work\",\"Okay\",\"Good\",\"Great\"] },"
+        "    { \"name\": \"Execution [Scripts Used/Driving Conversation/Achieved Goals]\", \"rating\": \"Needs Work|Okay|Good|Great\", \"notes\": \"2-5 sentences of coach analysis\", \"options\": [\"Needs Work\",\"Okay\",\"Good\",\"Great\"] },"
         "  ],"
-        "  \"next_steps\": [\"...\", \"...\"],"
-        "  \"transcript\": \"verbatim or cleaned transcript\""
+        "  \"next_steps\": [\"3-6 concrete actions the advisor should take next, optionally referencing https://www.salesfix.com/ resources\"],"
+        "  \"overall_feedback\": \"2-6 sentences summarizing strengths, gaps, and overall coaching guidance\","
+        "  \"recommended_materials\": [\"List of recommended Sales Fix materials (titles or URLs)\"],"
+        "  \"overall_score\": 55,"
+        "  \"transcript\": \"Cleaned transcript text of the voicemail (verbatim or lightly edited for clarity)\""
         "}"
-        "Ensure ratings reflect the call; always include all options in each section."
+        " Always include ALL THREE sections in the exact order above and include ALL four options in each section."
+        " Ratings must be one of the allowed values and reflect the call."
+        " Compute overall_score using 55% base plus: Needs Work=0, Okay=+5, Good=+10, Great=+15 per section (cap at 100)."
     )
 
 
@@ -187,6 +194,8 @@ def create_fix_my_call_docx(data: dict) -> tuple:
     date_iso = data.get("date_iso") or datetime.now().strftime("%Y-%m-%d")
     sections = data.get("sections", [])
     next_steps = data.get("next_steps", [])
+    overall_feedback = data.get("overall_feedback", "")
+    recommended_materials = data.get("recommended_materials", [])
     transcript = data.get("transcript", "")
 
     overall = compute_overall(sections)
@@ -233,6 +242,36 @@ def create_fix_my_call_docx(data: dict) -> tuple:
         for step in next_steps:
             li = doc.add_paragraph()
             _add_text(li, f"• {step}")
+    else:
+        li = doc.add_paragraph()
+        _add_text(li, "• (none)")
+
+    doc.add_paragraph("")
+
+    # Overall Feedback
+    if overall_feedback:
+        p = doc.add_paragraph()
+        _add_heading(p, "Overall Feedback")
+        pf = doc.add_paragraph()
+        _add_text(pf, overall_feedback)
+
+        doc.add_paragraph("")
+
+    # Recommended Sales Fix Material
+    p = doc.add_paragraph()
+    _add_heading(p, "Recommended Sales Fix Material")
+    if recommended_materials:
+        for item in recommended_materials:
+            li = doc.add_paragraph()
+            if isinstance(item, dict):
+                title = item.get("title") or item.get("name") or "Resource"
+                url = item.get("url") or item.get("link") or ""
+                text = f"• {title}"
+                if url:
+                    text += f" — {url}"
+                _add_text(li, text)
+            else:
+                _add_text(li, f"• {item}")
     else:
         li = doc.add_paragraph()
         _add_text(li, "• (none)")
